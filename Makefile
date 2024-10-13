@@ -25,6 +25,10 @@ test:
 	@echo "Testing..."
 	@go test ./... -v
 
+check_race:
+	go run --race ./cmd/server/main.go
+	
+
 loadenv:
 	@echo "Loading environment variables..."
 	source ./scripts/load_env.sh
