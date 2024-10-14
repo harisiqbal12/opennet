@@ -2,22 +2,24 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
-	"os"
+	"time"
 
-	"github.com/gofiber/fiber/v2"
-	routes "github.com/harisiqbal12/opennet/internal/api"
 	"github.com/harisiqbal12/opennet/pkg/node"
 )
 
 func main() {
 	fmt.Println("Starting Opennet!!")
+
+	dest := flag.String("address", "", "Destination multiaddr string")
+	flag.Parse()
+
+	log.Printf("Destination: %s", *dest)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// starting point
-	app := fiber.New()
 
 	networkChan := make(chan *node.Network)
 
@@ -28,22 +30,40 @@ func main() {
 
 	go node.CreateNetwork(opts)
 
-	network := <-networkChan
+	select {
+	case net := <-networkChan:
+		fmt.Println("Network initialized!")
 
-	var api fiber.Router = app.Group("/api/v1", func(c *fiber.Ctx) error {
+		if len(*dest) != 0 {
+			log.Printf("Attempting to connect to peer: %s", *dest)
+			net.ConnectToPeer(*dest)
+		}
 
-		c.Locals("network", network)
+		// Run discovery and connection attempts periodically
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
 
-		return c.Next()
-	})
+		for {
+			select {
+			case <-ticker.C:
+				log.Println("Running periodic discovery and connection attempts...")
+				net.Discover()
+				logPeerInfo(net)
+			case <-ctx.Done():
+				return
+			}
+		}
 
-	routes.SetupRoutes(api)
-
-	var PORT string = os.Getenv("PORT")
-
-	if len(PORT) == 0 {
-		PORT = "3000"
+	case <-time.After(60 * time.Second):
+		log.Println("Network initialization timed out.")
+		cancel()
 	}
+}
 
-	log.Fatal(app.Listen(":" + PORT))
+func logPeerInfo(net *node.Network) {
+	connectedPeers := net.Node.Network().Peers()
+	log.Printf("Connected peers: %d", len(connectedPeers))
+	for _, peer := range connectedPeers {
+		log.Printf("  - %s", peer.String())
+	}
 }

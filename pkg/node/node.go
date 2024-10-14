@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	routing "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/multiformats/go-multiaddr"
 )
 
 const service string = "opennet"
@@ -38,7 +39,7 @@ func CreateNetwork(opts NetworkOpts) *Network {
 
 func (n *Network) start(networkch chan *Network) {
 
-	conn, err := connmgr.NewConnManager(100, 500, connmgr.WithGracePeriod(time.Minute))
+	conn, err := connmgr.NewConnManager(0, 500, connmgr.WithGracePeriod(time.Minute))
 
 	if err != nil {
 		log.Fatalf("error initializing a conn manager %s", err)
@@ -54,6 +55,8 @@ func (n *Network) start(networkch chan *Network) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Printf("im here \n")
 
 	for _, addr := range node.Addrs() {
 		log.Printf("Listening on %s/p2p/%s \n", addr, node.ID().ShortString())
@@ -71,17 +74,28 @@ func (n *Network) start(networkch chan *Network) {
 		log.Fatalf("failed to bootstrap dht %s", err)
 	}
 
+	displayNodeAddress(node)
+
+	go n.connectToBootstrap()
+	go n.startDiscovery()
+
 	n.Node = node
 	n.dht = kademliaDHT
 
-	go n.connectToBootstrap()
-
 	networkch <- n
+}
 
-	go n.startDiscovery()
+func displayNodeAddress(node host.Host) {
+	for _, addr := range node.Addrs() {
+		fullAddr := fmt.Sprintf("%s/p2p/%s", addr, node.ID().ShortString())
+		log.Printf("Node address: %s", fullAddr)
+		fmt.Printf("\nTo connect to this node, run the program with:\n")
+		fmt.Printf("-address %s\n\n", fullAddr)
+	}
 }
 
 func (n *Network) connectToBootstrap() {
+	log.Printf("connecting bootstrap \n")
 	bootstrapPeers := dht.DefaultBootstrapPeers
 
 	var wg sync.WaitGroup
@@ -110,6 +124,8 @@ func (n *Network) connectToBootstrap() {
 }
 
 func (n *Network) startDiscovery() {
+	log.Printf("starting discovery \n")
+
 	routingDiscovery := routing.NewRoutingDiscovery(n.dht)
 	routingDiscovery.Advertise(n.ctx, service)
 
@@ -181,5 +197,26 @@ func (n *Network) Discover() {
 		} else {
 			log.Printf("connected with a peer")
 		}
+	}
+}
+
+func (n *Network) ConnectToPeer(peerAddr string) {
+	fmt.Printf("connect to peer \n")
+	multiAddr, err := multiaddr.NewMultiaddr(peerAddr)
+
+	if err != nil {
+		log.Fatalf("Invalid multiaddress: %s", err)
+	}
+
+	peerInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
+	if err != nil {
+		log.Fatalf("Failed to get peer info: %s", err)
+	}
+
+	err = n.Node.Connect(n.ctx, *peerInfo)
+	if err != nil {
+		log.Printf("Failed to connect to peer: %s", err)
+	} else {
+		log.Printf("Successfully connected to peer: %s", peerInfo.ID)
 	}
 }
