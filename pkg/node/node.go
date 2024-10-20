@@ -23,10 +23,17 @@ type NetworkOpts struct {
 	Networkch chan *Network
 }
 
+type Message struct {
+	From    string `json:"from"`
+	Content string `json:"content"`
+	Topic   string `json:"topic"`
+}
+
 type Network struct {
-	Node host.Host
-	ctx  context.Context
-	dht  *dht.IpfsDHT
+	Node    host.Host
+	ctx     context.Context
+	dht     *dht.IpfsDHT
+	msgChan chan *Message
 }
 
 func CreateNetwork(opts NetworkOpts) *Network {
@@ -55,8 +62,6 @@ func (n *Network) start(networkch chan *Network) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Printf("im here \n")
 
 	for _, addr := range node.Addrs() {
 		log.Printf("Listening on %s/p2p/%s \n", addr, node.ID().ShortString())

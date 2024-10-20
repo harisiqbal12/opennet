@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/harisiqbal12/opennet/pkg/node"
+	"github.com/harisiqbal12/opennet/pkg/server"
 )
 
 func main() {
@@ -33,6 +34,8 @@ func main() {
 	select {
 	case net := <-networkChan:
 		fmt.Println("Network initialized!")
+
+		go server.StartServer(net)
 
 		if len(*dest) != 0 {
 			log.Printf("Attempting to connect to peer: %s", *dest)
