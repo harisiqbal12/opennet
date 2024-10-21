@@ -34,39 +34,10 @@ func main() {
 	select {
 	case net := <-networkChan:
 		fmt.Println("Network initialized!")
-
-		go server.StartServer(net)
-
-		if len(*dest) != 0 {
-			log.Printf("Attempting to connect to peer: %s", *dest)
-			net.ConnectToPeer(*dest)
-		}
-
-		// Run discovery and connection attempts periodically
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				log.Println("Running periodic discovery and connection attempts...")
-				net.Discover()
-				logPeerInfo(net)
-			case <-ctx.Done():
-				return
-			}
-		}
+		server.StartServer(net)
 
 	case <-time.After(60 * time.Second):
 		log.Println("Network initialization timed out.")
 		cancel()
-	}
-}
-
-func logPeerInfo(net *node.Network) {
-	connectedPeers := net.Node.Network().Peers()
-	log.Printf("Connected peers: %d", len(connectedPeers))
-	for _, peer := range connectedPeers {
-		log.Printf("  - %s", peer.String())
 	}
 }

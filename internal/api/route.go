@@ -7,4 +7,5 @@ import (
 
 func SetupRoutes(app fiber.Router) {
 	app.Post("/publish", handlers.Publish)
+	app.Post("/connect", handlers.Connect)
 }
